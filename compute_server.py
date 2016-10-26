@@ -3,6 +3,7 @@ import threading
 import logging
 import json
 from unidecode import unidecode
+import time
 LOG_FILE = 'compute_server.log'
 
 # Enable logging
@@ -80,7 +81,19 @@ class ThreadedServer(object):
         data=unidecode(client.recv(SIZE).decode('ascii').strip())
         vm_data=json.loads(data)
         zone=self.zones.get(vm_data['zone'])
-        return zone
+        logger.info('Starting vm %s on zone %s ' % (vm_data.get('name'),vm_data.get('zone')))
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((zone.get('address'),zone.get('port')))
+        s.send('startvm')
+        time.sleep(1)
+        recv_data=s.recv(SIZE).decode('ascii').strip()
+        #VM FORMAT {"name":"vmname","type":"vmtype"}
+        data={"name":vm_data.get('name'),"type":vm_data.get('type')}
+        data=json.dumps(data)
+        s.send(data)
+        recv_data=s.recv(SIZE).decode('ascii').strip()
+        s.close()
+        return recv_data
 
 
             

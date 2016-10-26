@@ -5,6 +5,8 @@ import json
 from unidecode import unidecode
 import uuid
 import time
+from utils import utility
+import os
 LOG_FILE = 'compute_client.log'
 
 # Enable logging
@@ -36,6 +38,7 @@ class ThreadedServer(object):
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         self.sock.bind((self.local_address,self.port))
+        self.count=0
         logger.info('[ DONE ] Server binded on %s:%d' % (self.local_address,self.port))
 
     def listen(self):
@@ -77,8 +80,16 @@ class ThreadedServer(object):
         client.send('OK WAITING\n')
         data=unidecode(client.recv(SIZE).decode('ascii').strip())
         vm_data=json.loads(data)
-        #nohup ./myprogram.sh > /dev/null 2>&1 & echo $! > run.pid
-        return zone
+        mac=utility.generate_mac_address(self.count)
+        self.count+=1
+        filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/gabriele/Scrivania/vm1.img","512")
+        os.system('chmod +x ' + filename)
+        os.system('sudo ./'+filename)
+        # VM STARTED FORMAT {"name":"vmname","address":"vmmac"}
+        data={"name":vm_data.get('name'),"address":mac}
+        data=json.dumps(data)
+        client.send(data)
+        client.close()
 
 
     def serveClient(self,client,address):
