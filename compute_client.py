@@ -80,7 +80,7 @@ class ThreadedServer(object):
         client.send('OK WAITING\n')
         data=unidecode(client.recv(SIZE).decode('ascii').strip())
         vm_data=json.loads(data)
-        mac=utility.generate_mac_address(self.count)
+        mac=utility.generate_mac_address(self.count,self.uuid)
         self.count+=1
         filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/gabriele/Scrivania/vm1.img","512")
         os.system('chmod +x ' + filename)

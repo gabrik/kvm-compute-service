@@ -92,7 +92,7 @@ class ThreadedServer(object):
         data=json.dumps(data)
         s.send(data)
         recv_data=s.recv(SIZE).decode('ascii').strip()
-        s.close()
+        #s.close()
         return recv_data
 
 
