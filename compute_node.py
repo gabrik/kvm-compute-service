@@ -147,17 +147,22 @@ class ThreadedServer(object):
 
 
 
-    def kill_vm(self,client):
-        SIZE=1024
-        logger.info('Received kill vm request')
-        client.send('OK WAITING\n')
-        data=unidecode(client.recv(SIZE).decode('ascii').strip())
+    def kill_vm(self,client,value):
+        #SIZE=1024
+        #logger.info('Received kill vm request')
+        #client.send('OK WAITING\n')
+        #data=unidecode(client.recv(SIZE).decode('ascii').strip())
         #VM DATA {"uuid":"vmuuid"}
-        vm_data=json.loads(data)
-        vm_name=self.vms.get(vm_data.get('uuid'))
+        #vm_data=json.loads(data)
+        vm_data=value
+        vm_name=self.vms.get(vm_data.get('uuid')).get('name')
         utility.destroy_vm(vm_name)
-        response={'status':True}
-        client.send(json.dumps(response)+'\n')
+
+        msg_value={"status":True}
+        msg_type=12
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
+        client.send(msg)
 
     def read_from_client(self,client):
         SIZE=1024
@@ -196,8 +201,8 @@ class ThreadedServer(object):
 
                     if msg_type==0:
                         self.start_vm(client,msg_value)
-                    #elif msg_type==2:
-                    #    self.add_zone(client,msg_value)
+                    elif msg_type==1:
+                       self.kill_vm(client,msg_value)
                     elif msg_type==7:
                         logger.info('Ping from %s:%s' % address)
                         self.pong(client)

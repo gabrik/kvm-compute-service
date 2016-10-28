@@ -60,9 +60,12 @@ class ThreadedServer(object):
     def run_cp2(self):
         return '{"status":True,"address":"192.168.2.84"}'
 
-    def show_vms(self):
-        response=json.dumps(self.vms)
-        return response
+    def show_vms(self,client):
+        msg_value={"status":True,'res':self.vms}
+        msg_type=12
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
+        client.send(msg)
 
     def show_zones(self,client):
         msg_value={"status":True,'res':self.zones}
@@ -135,7 +138,7 @@ class ThreadedServer(object):
             logger.info('received %s from compute node' % recv_data)
             if msg_value.get('status',0) == 1:
                 flag=False
-                self.vms[recv_data.get('uuid')]=vm_data.get('zone')
+                self.vms[msg_value.get('uuid')]=vm_data.get('zone')
                 
                 c_msg_type=10
                 c_msg={'type':msg_type,'value':None}
@@ -162,27 +165,38 @@ class ThreadedServer(object):
         client.send(msg)
 
 
-    def kill_vm(self,client):
-        SIZE=1024
+    def kill_vm(self,client,value):
+        #SIZE=1024
         #VM KILL FORMAT {'uuid':'vmuuid'}
-        client.send('OK WAITING\n')
-        data=unidecode(client.recv(SIZE).decode('ascii').strip())
-        vm_data=json.loads(data)
+        #client.send('OK WAITING\n')
+        #data=unidecode(client.recv(SIZE).decode('ascii').strip())
+        #vm_data=json.loads(data)
+        vm_data=value
         zone=self.zones.get(self.vms[vm_data.get('uuid')])
         logger.info('killing vm %s on zone %s ' % (vm_data.get('uuid'),self.vms[vm_data.get('uuid')]))
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((zone.get('address'),zone.get('port')))
-        s.send('killvm')
 
-        recv_data=s.recv(SIZE).decode('ascii').strip()
-        logger.info('received %s from compute node' % recv_data)
-        data={"uuid":vm_data.get('uuid')}
-        data=json.dumps(data)
-        s.send(data)
-        recv_data=s.recv(SIZE).decode('ascii').strip()
-        self.vms.pop(vm_data.get('uuid'))
-        return json.loads(recv_data)
+        compute = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        compute.connect((zone.get('address'),zone.get('port')))
+        
+        msg_value={"uuid":vm_data.get('uuid')}
+        msg_type=1
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
+
+        logger.info('sending %s to compute node' % msg)
+
+        compute.send(msg)
+        recv_data=self.read_from_client(compute)
+        msg_type=recv_data.get('type',10)
+        msg_value=recv_data.get('value',None)
+
+        if msg_type==12:
+            logger.info('status of kill %s', msg_value.get('status',False))
+        msg={'type':msg_type,value:msg_value}
+        msg=json.dumps(msg)
+        client.send(msg)
+
 
 
 
@@ -206,8 +220,15 @@ class ThreadedServer(object):
 
                     if msg_type==0:
                         self.start_vm(client,msg_value)
+                    elif msg_type==1:
+                        self.kill_vm(client,msg_value)
                     elif msg_type==2:
                         self.add_zone(client,msg_value)
+                    elif msg_type==3:
+                        #self.add_zone(client,msg_value)
+                        client.send("nope")
+                    elif msg_type==4:
+                        self.show_vms(client)
                     elif msg_type==5:
                         self.show_zones(client)
                     elif msg_type==7:
