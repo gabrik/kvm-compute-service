@@ -14,7 +14,7 @@ logging.basicConfig(filename=LOG_FILE,format='%(asctime)s - %(name)s - %(levelna
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-commands=["startvm","shutdownvm","destroyzone","close"]
+commands=["startvm","shutdownvm","destroyzone","close",'killvm']
 
 #TODO load configuration from file (ip,port, compute server ip, zone name)
 
@@ -33,7 +33,7 @@ class ThreadedServer(object):
         self.local_address=s.getsockname()[0]
         s.close()
 
-        
+        self.vms={}
 
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
@@ -82,14 +82,47 @@ class ThreadedServer(object):
         vm_data=json.loads(data)
         mac=utility.generate_mac_address(self.count,self.uuid)
         self.count+=1
+        logger.info('Generating file and image...')
         filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/gabriele/Scrivania/vm1.img","512")
+        logger.info('Generated file %s' % filename)
         os.system('chmod +x ' + filename)
+        logger.info('Starting vm %s' % filename)
         os.system('sudo ./'+filename)
-        # VM STARTED FORMAT {"name":"vmname","address":"vmmac"}
-        data={"name":vm_data.get('name'),"address":mac}
-        data=json.dumps(data)
-        client.send(data)
+        logger.info('Waiting for boot to complete...')
+        vm_uuid=uuid.uuid4().urn[9:]
+        while True:
+            time.sleep(2)
+            res=utility.get_inet_address_from_mac("127.0.0.1",mac)
+            if res!=False:
+                logger.info('Instance started ip is %s' % res)
+                ip=res
+                data={"name":vm_data.get('name'),"address":mac,"uuid":vm_uuid,"ip":ip,"status":True}
+                data=json.dumps(data)
+                logger.info('sending to compute server %s' % data)
+                client.send(data)
+                self.vms[vm_uuid]=vm_data.get('name')
+                break
+            logger.info('Waiting for boot to complete...')
+            data={"name":vm_data.get('name'),"address":mac,"uuid":vm_uuid,"ip":"","status":False}
+            data=json.dumps(data)
+            logger.info('sending to compute server %s' % data)
+            client.send(data)
+
+        # VM STARTED FORMAT {"name":"vmname","address":"vmmac","uuid":"vmuuid","ip":"vm_ip"}
         client.close()
+
+    def kill_vm(self,client):
+        SIZE=1024
+        logger.info('Received kill vm request')
+        client.send('OK WAITING\n')
+        data=unidecode(client.recv(SIZE).decode('ascii').strip())
+        #VM DATA {"uuid":"vmuuid"}
+        vm_data=json.loads(data)
+        vm_name=self.vms.get(vm_data.get('uuid'))
+        utility.destroy_vm(vm_name)
+        response={'status':True}
+        client.send(json.dumps(response)+'\n')
+
 
 
     def serveClient(self,client,address):
@@ -102,6 +135,8 @@ class ThreadedServer(object):
                 if data in commands:
                     if data=="startvm":
                         response=json.dumps(self.start_vm(client))+'\n'
+                    elif data == "killvm":
+                         response=json.dumps(self.kill_vm(client))+'\n'
                     elif data == "shutdownvm":
                         response=self.show_zones()+'\n'
                     elif data=="destroyzone":
