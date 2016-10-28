@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import socket
 import threading
 import logging
@@ -38,6 +40,12 @@ class ThreadedServer(object):
             client.settimeout(120)
             threading.Thread(target=self.serveClient,args=(client,address)).start()
 
+    def read_from_client(self,client):
+        SIZE=1024
+        recv_data=unidecode(client.recv(SIZE).decode('ascii').strip())
+        logger.info('Received %s from client' % recv_data)
+        recv_data=json.loads(recv_data)
+        return recv_data
 
     def run_es(self):
         return '{"status":True,"address":"192.168.2.80"}'
@@ -56,67 +64,103 @@ class ThreadedServer(object):
         response=json.dumps(self.vms)
         return response
 
-    def show_zones(self):
-        response=json.dumps(self.zones)
-        return response
+    def show_zones(self,client):
+        msg_value={"status":True,'res':self.zones}
+        msg_type=12
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
+        client.send(msg)
 
 
-    def add_zone(self,client):
+    def add_zone(self,client,value):
         logger.info('Received zone adding request ')
-        SIZE=1024
+        #SIZE=1024
         #{"name":"zone_name","uuid":"zone_uuid","address":"zone_ip_address","port":"zone_tcp_port"} ZONE FORMAT
-        client.send('OK WAITING\n')
-        data=unidecode(client.recv(SIZE).decode('ascii').strip())
-        logger.info('Trying to add zone %s ' % data)
-        zone_data=json.loads(data)
+        #client.send('OK WAITING\n')
+        #data=unidecode(client.recv(SIZE).decode('ascii').strip())
+        #logger.info('Trying to add zone %s ' % data)
+        #zone_data=json.loads(data)
+        zone_data=value
         uuid=zone_data['uuid']
         zone_data.pop('uuid')
         self.zones[uuid]=zone_data
         logger.info('Added zone %s' % uuid)
         print 'zona aggiunta %s' % uuid
-        response={'status':True,'uuid':uuid}
-        return response
+        
+        msg_value={"status":True}
+        msg_type=12
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
+        client.send(msg)
 
-    def start_vm(self,client):
+        while True:
+            time.sleep(10)
+            self.ping(client)
+            recv_data=self.read_from_client(client)
+            msg_type=recv_data.get('type',10)
+            msg_value=recv_data.get('value',None)
+            if msg_type==8:
+                logger.info('pong from %r' % client)
+
+
+    def start_vm(self,client,value):
         SIZE=1024
         #VM FORMAT {"zone":"zone_uuid","name":"vmname","type":"vmtype"}
-        vmtype=['dhcp','es','acquirer','mysql','orchestrator','frontend','cp1','cp2','client']
-        client.send('OK WAITING\n')
-        data=unidecode(client.recv(SIZE).decode('ascii').strip())
-        vm_data=json.loads(data)
+        #vmtype=['dhcp','es','acquirer','mysql','orchestrator','frontend','cp1','cp2','client']
+        #client.send('OK WAITING\n')
+        #data=unidecode(client.recv(SIZE).decode('ascii').strip())
+        #vm_data=json.loads(data)
+        vm_data=value
         zone=self.zones.get(vm_data['zone'])
         logger.info('Starting vm %s on zone %s ' % (vm_data.get('name'),vm_data.get('zone')))
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((zone.get('address'),zone.get('port')))
-        s.send('startvm')
-        time.sleep(1)
-       
+        compute = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        compute.connect((zone.get('address'),zone.get('port')))
 
-        recv_data=s.recv(SIZE).decode('ascii').strip()
-        logger.info('received %s from compute node' % recv_data)
-        #VM FORMAT {"name":"vmname","type":"vmtype"}
-        data={"name":vm_data.get('name'),"type":vm_data.get('type')}
-        data=json.dumps(data)
-        s.send(data)
+        msg_value={"name":vm_data.get('name'),"type":vm_data.get('type')}
+        msg_type=0
+        msg={'type':msg_type,'value':msg_value}
+        msg=json.dumps(msg)
 
-        while True:
-            recv_data=unidecode(s.recv(SIZE).decode('ascii').strip())
-            recv_data=json.loads(recv_data)
+        logger.info('sending %s to compute node' % msg)
+
+        compute.send(msg)
+
+        flag=True
+        while flag:
+            recv_data=self.read_from_client(compute)
+            msg_type=recv_data.get('type',10)
+            msg_value=recv_data.get('value',None)
+
             logger.info('received %s from compute node' % recv_data)
-            if recv_data.get('status',False) == True:
-                recv_data['status']='running'
-                send_data=json.dumps(recv_data)
-                #client.send(send_data+'\n')
+            if msg_value.get('status',0) == 1:
+                flag=False
                 self.vms[recv_data.get('uuid')]=vm_data.get('zone')
-                break
-            else:
-                data_client={"status":"booting"}
-                data_client=json.dumps(data_client)
-                client.send(data_client+'\n')
+                
+                c_msg_type=10
+                c_msg={'type':msg_type,'value':None}
+                c_msg=json.dumps(c_msg)
+                compute.send(c_msg)
+                compute.close()
+                
+            
+            msg={'type':msg_type,'value':msg_value}
+            msg=json.dumps(msg)
+            logger.info('sending %s to client' % msg)
+            client.send(msg+'\n')
 
-        #s.close()
-        return send_data
+    def pong(self,client):
+        msg_type=8
+        msg={'type':msg_type,'value':None}
+        msg=json.dumps(msg)
+        client.send(msg)
+
+    def ping(self,client):
+        msg_type=7
+        msg={'type':msg_type,'value':None}
+        msg=json.dumps(msg)
+        client.send(msg)
+
 
     def kill_vm(self,client):
         SIZE=1024
@@ -148,12 +192,36 @@ class ThreadedServer(object):
         SIZE=1024
         while True:
             try:
-                data=client.recv(SIZE).decode('ascii').strip()
-                logger.info('Received %s from client' % data)
-                if data in commands:
 
-                    if data=="startvm":
-                        response=json.dumps(self.start_vm(client))+'\n'
+                recv_data=unidecode(client.recv(SIZE).decode('ascii').strip())
+                logger.info('Received %s from client' % recv_data)
+                print ('received %s \n' % recv_data)
+                ammisible_types=range(0,11)
+                recv_data=json.loads(recv_data)
+                
+                msg_type=recv_data.get('type',10)
+                msg_value=recv_data.get('value',None)
+                
+                if msg_type in ammisible_types:
+
+                    if msg_type==0:
+                        self.start_vm(client,msg_value)
+                    elif msg_type==2:
+                        self.add_zone(client,msg_value)
+                    elif msg_type==5:
+                        self.show_zones(client)
+                    elif msg_type==7:
+                        logger.info('Ping from %s:%s' % address)
+                        self.pong(client)
+                    elif msg_type==8:
+                        logger.info('pong from %s:%s' % address)
+                        self.ping(client)
+                    elif msg_type==10:
+                        client.close()
+                        return True
+
+
+                        '''
                     elif data == "killvm":
                         response=json.dumps(self.kill_vm(client))+'\n'
                     elif data == "zones":
@@ -168,13 +236,14 @@ class ThreadedServer(object):
                         return True
 
                     client.send(response)
+                    '''
                 else:
                     client.send("{'status':false,'error':'wrong command'}\n")
                     logger.info('[ ERRO ] Client %s:%s wrong command!' % address)
                     raise Exception('client disconnected')
             except Exception as e:
-                client.send("{'status':false,'error':'aborting'}\n")
-                client.close()
+                #client.send("{'status':false,'error':'aborting'}\n")
+                #client.close()
                 logger.error('%r' % e)
                 print ('error %r' % e)
                 return False
