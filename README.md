@@ -47,7 +47,10 @@ Valore di type riservato 99
 
 *	res in lista zone {"uuid":uuid_zona,"value":{json informazoni zona, chiavi: port,name,address}}
 
-ES risposta alla richiesta della lista delle zone
+ES risposta alla richiesta della lista delle zone:
+
 {"type": 12, "value": {"status": true, "res": [{"uuid": "824808e4-4f3a-4606-8b02-844c30d7ea62", "value": {"port": 5001, "name": "local", "address": "127.0.0.1"}}]}}
+
 |<------------------>||<-------------------->||<------------------------------------------------------------------------------------------------------------------>|
+
 	Tipo risposta  		stato della risposta      dati della risposta
