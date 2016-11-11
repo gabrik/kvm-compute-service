@@ -68,7 +68,16 @@ class ThreadedServer(object):
         client.send(msg)
 
     def show_zones(self,client):
-        msg_value={"status":True,'res':self.zones}
+
+        all_zones=[]
+        for uuid in self.zones:
+            zone={}
+            zone['uuid']=uuid
+            zone['value']=self.zones[uuid]
+            all_zones.append(zone)
+
+
+        msg_value={"status":True,'res':all_zones}
         msg_type=12
         msg={'type':msg_type,'value':msg_value}
         msg=json.dumps(msg)
