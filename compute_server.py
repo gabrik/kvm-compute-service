@@ -64,7 +64,7 @@ class ThreadedServer(object):
         msg_value={"status":True,'res':self.vms}
         msg_type=12
         msg={'type':msg_type,'value':msg_value}
-        msg=json.dumps(msg)+'\n'
+        msg=json.dumps(msg)
         client.send(msg)
 
     def show_zones(self,client):
@@ -80,8 +80,7 @@ class ThreadedServer(object):
         msg_value={"status":True,'res':all_zones}
         msg_type=12
         msg={'type':msg_type,'value':msg_value}
-        msg=json.dumps(msg)+'\n'
-        print('sending %s' % msg)
+        msg=json.dumps(msg)
         client.send(msg)
 
 
@@ -166,13 +165,13 @@ class ThreadedServer(object):
         msg_type=8
         msg={'type':msg_type,'value':None}
         msg=json.dumps(msg)
-        client.send(msg+'\n')
+        client.send(msg)
 
     def ping(self,client):
         msg_type=7
         msg={'type':msg_type,'value':None}
         msg=json.dumps(msg)
-        client.send(msg+'\n')
+        client.send(msg)
 
 
     def kill_vm(self,client,value):
@@ -185,18 +184,16 @@ class ThreadedServer(object):
         zone=self.zones.get(self.vms[vm_data.get('uuid')])
         logger.info('killing vm %s on zone %s ' % (vm_data.get('uuid'),self.vms[vm_data.get('uuid')]))
 
+
         compute = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         compute.connect((zone.get('address'),zone.get('port')))
         
-
-        #sending {"type": 1, "value": {"uuid": "39f00145-ebf1-46bc-8ab7-57fe53e914e0"}} to compute node
-
         msg_value={"uuid":vm_data.get('uuid')}
         msg_type=1
         msg={'type':msg_type,'value':msg_value}
-        msg=json.dumps(msg)+'\n'
-        logger.info('sending %s to compute node' % msg)
+        msg=json.dumps(msg)
 
+        logger.info('sending %s to compute node' % msg)
 
         compute.send(msg)
         recv_data=self.read_from_client(compute)
@@ -205,12 +202,9 @@ class ThreadedServer(object):
 
         if msg_type==12:
             logger.info('status of kill %s', msg_value.get('status',False))
-        #msg={'type':msg_type,value:msg_value}
-        msg_type=11
-        vm_data['status']=2
-        msg={'type':msg_type,'value':vm_data}
+        msg={'type':msg_type,value:msg_value}
         msg=json.dumps(msg)
-        client.send(msg+'\n')
+        client.send(msg)
 
 
 
@@ -223,8 +217,6 @@ class ThreadedServer(object):
             try:
 
                 recv_data=unidecode(client.recv(SIZE).decode('ascii').strip())
-                #if recv_data=='': 
-                #    break
                 logger.info('Received %s from client' % recv_data)
                 print ('received %s \n' % recv_data)
                 ammisible_types=range(0,11)
