@@ -81,7 +81,7 @@ class ThreadedServer(object):
         msg_type=12
         msg={'type':msg_type,'value':msg_value}
         msg=json.dumps(msg)
-        client.send(msg)
+        client.send(msg+'\n')
 
 
     def add_zone(self,client,value):
@@ -103,7 +103,7 @@ class ThreadedServer(object):
         msg_type=12
         msg={'type':msg_type,'value':msg_value}
         msg=json.dumps(msg)
-        client.send(msg)
+        client.send(msg+'\n')
 
         while True:
             time.sleep(10)
@@ -136,7 +136,7 @@ class ThreadedServer(object):
 
         logger.info('sending %s to compute node' % msg)
 
-        compute.send(msg)
+        compute.send(msg+'\n')
 
         flag=True
         while flag:
@@ -152,7 +152,7 @@ class ThreadedServer(object):
                 c_msg_type=10
                 c_msg={'type':msg_type,'value':None}
                 c_msg=json.dumps(c_msg)
-                compute.send(c_msg)
+                compute.send(c_msg+'\n')
                 compute.close()
                 
             
@@ -165,13 +165,13 @@ class ThreadedServer(object):
         msg_type=8
         msg={'type':msg_type,'value':None}
         msg=json.dumps(msg)
-        client.send(msg)
+        client.send(msg+'\n')
 
     def ping(self,client):
         msg_type=7
         msg={'type':msg_type,'value':None}
         msg=json.dumps(msg)
-        client.send(msg)
+        client.send(msg+'\n')
 
 
     def kill_vm(self,client,value):
@@ -204,7 +204,7 @@ class ThreadedServer(object):
             logger.info('status of kill %s', msg_value.get('status',False))
         msg={'type':msg_type,value:msg_value}
         msg=json.dumps(msg)
-        client.send(msg)
+        client.send(msg+'\n')
 
 
 

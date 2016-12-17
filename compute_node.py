@@ -107,7 +107,7 @@ class ThreadedServer(object):
         mac=utility.generate_mac_address(self.count,self.uuid)
         self.count+=1
         logger.info('Generating file and image...')
-        filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/wave/Scrivania/template_vm/vm.img","512",conf['zone']['bridge'])
+        filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/wave/Desktop/template_vm/vm.img","512",conf['zone']['bridge'])
         logger.info('Generated file %s' % filename)
         os.system('chmod +x ' + filename)
         logger.info('Starting vm %s' % filename)
