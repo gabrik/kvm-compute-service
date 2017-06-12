@@ -8,12 +8,18 @@ import time
 from utils import utility
 import os
 import sys
-LOG_FILE = 'compute_node.log'
+#LOG_FILE = 'compute_node.log'
+
+
+
 
 # Enable logging
-logging.basicConfig(filename=LOG_FILE,format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO)
-logger = logging.getLogger(__name__)
+#logging.basicConfig(filename=LOG_FILE,format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#    level=logging.INFO)
+#logger = logging.getLogger(__name__)
+
+logger=None
+
 
 commands=["startvm","shutdownvm","destroyzone","close",'killvm']
 
@@ -83,10 +89,10 @@ class ThreadedServer(object):
             msg_type=recv_data.get('type',10)
             msg_value=recv_data.get('value',None)
             if msg_type==7:
-                logger.info('ping receiver from %r' % server)
+                logger.info('ping receiver from %r' % server.getpeername()[0])
                 self.pong(server)
             elif msg_type==8:
-                logger.info('pong from %r' % server)
+                logger.info('pong from %r' % server.getpeername()[0])
                 self.ping(client)
             elif msg_type==10:
                 server.close()
@@ -107,18 +113,19 @@ class ThreadedServer(object):
         mac=utility.generate_mac_address(self.count,self.uuid)
         self.count+=1
         logger.info('Generating file and image...')
-        filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/wave/Desktop/template_vm/vm.img","512",conf['zone']['bridge'])
+        #filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/user2/Scrivania/template_vm/vm.img","512",conf['zone']['bridge'])
+        filename=utility.create_vm_start_file(vm_data.get('name'),mac,"/home/user2/Scrivania/template_vm/acquirer/acquirer.bin","128",conf['zone']['bridge'])
         logger.info('Generated file %s' % filename)
         os.system('chmod +x ' + filename)
         logger.info('Starting vm %s' % filename)
         os.system('sudo ./'+filename)
         logger.info('Waiting for boot to complete...')
         vm_uuid=uuid.uuid4().urn[9:]
-
         while True:
             time.sleep(2)
-            res=utility.get_inet_address_from_mac("127.0.0.1",mac)
+            res=utility.get_inet_address_from_mac("192.168.0.1",mac)
             ip=""
+            logger.info("Getting IP from Controller VM MAC: %s" % mac)
             if res!=False:
                 logger.info('Instance started ip is %s' % res)
                 ip=res
@@ -130,8 +137,6 @@ class ThreadedServer(object):
                 client.send(msg)
                 self.vms[vm_uuid]=vm_data
                 break
-
-            logger.info('Waiting for boot to complete...')
             msg_value={"name":vm_data.get('name'),"address":mac,"uuid":vm_uuid,"ip":ip,"status":0}
             msg_type=11
             msg={'type':msg_type,'value':msg_value}
@@ -207,28 +212,15 @@ class ThreadedServer(object):
                     elif msg_type==1:
                        self.kill_vm(client,msg_value)
                     elif msg_type==7:
-                        logger.info('Ping from %s:%s' % address)
+                        logger.info('Ping from %s:%s' % address.getpeername()[0])
                         self.pong(client)
                     elif msg_type==8:
-                        logger.info('pong from %s:%s' % address)
+                        logger.info('pong from %s:%s' % address.getpeername()[0])
                         self.ping(client)
                     elif msg_type==10:
                         client.close()
                         return True
-                        '''
-                    elif data == "killvm":
-                         response=json.dumps(self.kill_vm(client))+'\n'
-                    elif data == "shutdownvm":
-                        response=self.show_zones()+'\n'
-                    elif data=="destroyzone":
-                        response=json.dumps(self.add_zone(client))+'\n'
-                    elif data == "close":
-                        client.send("{'status':true}\n")
-                        client.close()
-                        return True
-
-                    client.send(response)
-                    '''
+                        
                 else:
                     client.send("{'status':false,'error':'wrong command'}\n")
                     logger.info('[ ERRO ] Client %s:%s wrong command!' % address)
@@ -245,6 +237,11 @@ if __name__ == "__main__":
     
     global conf
     conf=utility.load_configuration(sys.argv[1])
+    LOG_FILE=str('compute_node_%s.log' % conf['zone']['name'])
+    logging.basicConfig(filename=LOG_FILE,format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO)
+    global logger
+    logger = logging.getLogger(__name__)
 
     #{'zone': {'bridge': 's1-br0', 'uuid': 'a4e6e4ea-c047-11e6-b33b-b742217de0a3', 'name': 'ct', 'port': '5001'}, 'server': {'ip': '127.0.0.1', 'port': '5050'}}
 
