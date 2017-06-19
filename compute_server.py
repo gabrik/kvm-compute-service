@@ -5,6 +5,7 @@ import threading
 import logging
 import json
 from unidecode import unidecode
+from dds.dds import *
 import time
 
 LOG_FILE = 'compute_server.log'
@@ -18,6 +19,20 @@ commands=["zones","startvm","addzone",'close','vms','killvm']
 
 #TODO load configuration from file (ip,port, controller ip)
 
+
+
+class ZoneInformation:
+    def __init__(self,json):
+    #{"name":self.name,"uuid":self.uuid,"address":self.local_address,"port":self.port}
+        self.name=json.get('name')
+        self.uuid=json.get('uuid')
+        self.address=json.get('address')
+        self.port=json.get('port')
+
+    def __str__(self):
+        return 'VehiclePosition({0}, {1})'.format(self.uuid, self.name)
+
+
 class ThreadedServer(object):
 
     def __init__(self,host,port):
@@ -27,9 +42,23 @@ class ThreadedServer(object):
         self.zones={}
         self.vms={}
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-        self.sock.bind((self.host,self.port))
+        #self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        #self.sock.bind((self.host,self.port))
         logger.info('[ DONE ] Server binded on %s:%d' % (self.host,self.port))
+
+
+        #### DDS ###
+        self.rt=Runtime()
+        self.dp=Participant(0)
+
+
+        self.register_topic=FlexyTopic(self.dp,'KeyValue', lambda x: x.uuid,None)
+        self.register_subscriber=Subscriber(self.dp,[Partition(['dds-kvm.registration'])])
+
+        
+        self.register_reader=FlexyReader(self.register_subscriber,self.register_topic,[Reliable(),KeepLastHistory(1)],self.add_zone_dds)
+        ### DDS ###
+
         
     def listen(self):
         self.sock.listen(5)
@@ -83,6 +112,15 @@ class ThreadedServer(object):
         msg=json.dumps(msg)
         client.send(msg+'\n')
 
+
+    ## DDS ###
+
+    def add_zone_dds(self):
+        samples=r.read(all_samples())
+        for s in samples:
+            print ('Reader>>{0}'.format(s))
+
+    ## DDS ###
 
     def add_zone(self,client,value):
         logger.info('Received zone adding request ')
@@ -161,17 +199,17 @@ class ThreadedServer(object):
             logger.info('sending %s to client' % msg)
             client.send(msg+'\n')
 
-    def pong(self,client):
-        msg_type=8
-        msg={'type':msg_type,'value':None}
-        msg=json.dumps(msg)
-        client.send(msg+'\n')
+#    def pong(self,client):
+#        msg_type=8
+#        msg={'type':msg_type,'value':None}
+#        msg=json.dumps(msg)
+#        client.send(msg+'\n')
 
-    def ping(self,client):
-        msg_type=7
-        msg={'type':msg_type,'value':None}
-        msg=json.dumps(msg)
-        client.send(msg+'\n')
+#    def ping(self,client):
+#        msg_type=7
+#        msg={'type':msg_type,'value':None}
+#        msg=json.dumps(msg)
+#        client.send(msg+'\n')
 
 
     def kill_vm(self,client,value):

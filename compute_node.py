@@ -8,6 +8,8 @@ import time
 from utils import utility
 import os
 import sys
+from dds.dds import *
+
 #LOG_FILE = 'compute_node.log'
 
 
@@ -24,6 +26,20 @@ logger=None
 commands=["startvm","shutdownvm","destroyzone","close",'killvm']
 
 conf={}
+
+class ZoneInformation:
+    def __init__(self,json):
+    #{"name":self.name,"uuid":self.uuid,"address":self.local_address,"port":self.port}
+        self.name=json.get('name')
+        self.uuid=json.get('uuid')
+        self.address=json.get('address')
+        self.port=json.get('port')
+
+    def __str__(self):
+        return 'ZoneInformation >> ({0}, {1})'.format(self.uuid, self.name)
+
+
+
 
 #TODO load configuration from file (ip,port, compute server ip, zone name)
 
@@ -45,21 +61,48 @@ class ThreadedServer(object):
         self.vms={}
 
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-        self.sock.bind((self.local_address,self.port))
+#        self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+#        self.sock.bind((self.local_address,self.port))
         self.count=0
+
+        ### DDS ###
+
+        self.rt=Runtime()
+        self.dp=Participant(0)
+
+
+        self.register_topic=FlexyTopic(self.dp,'KeyValue', lambda x: x.uuid,None)
+        self.register_publisher=Publisher(self.dp,[Partition(['dds-kvm.registration'])])
+        self.register_writer=FlexyWriter(self.register_publisher,self.register_topic,[Reliable(),KeepLastHistory(1)])
+
+        ### DDS ###
+        
+
+
         logger.info('[ DONE ] Server binded on %s:%d' % (self.local_address,self.port))
 
     def listen(self):
         self.sock.listen(5)
-        threading.Thread(target=self.register_to_server).start()
+        #threading.Thread(target=self.register_to_server).start()
+        threading.Thread(target=self.register_to_server_dds).start()
         logger.info('[ DONE ] Server listen on %s:%d' % (self.local_address,self.port))
         while True:
             client,address = self.sock.accept()
             logger.info('[ INFO ] Connection from %s:%s' % address)
             client.settimeout(120)
             threading.Thread(target=self.serveClient,args=(client,address)).start()
-            
+
+
+    ## DDS ##
+
+    def register_to_server_dds(self):
+        msg_value={"name":self.name,"uuid":self.uuid,"address":self.local_address,"port":self.port}
+
+        info=ZoneInformation(msg_value)
+
+        self.register_writer.write(info)
+
+    ## DDS  ##
 
     def register_to_server(self):
         SIZE=1024
@@ -179,17 +222,17 @@ class ThreadedServer(object):
         recv_data=json.loads(recv_data)
         return recv_data
 
-    def pong(self,client):
-        msg_type=8
-        msg={'type':msg_type,'value':None}
-        msg=json.dumps(msg)
-        client.send(msg)
+#    def pong(self,client):
+#        msg_type=8
+#        msg={'type':msg_type,'value':None}
+#        msg=json.dumps(msg)
+#        client.send(msg)
 
-    def ping(self,client):
-        msg_type=7
-        msg={'type':msg_type,'value':None}
-        msg=json.dumps(msg)
-        client.send(msg)
+#    def ping(self,client):
+#        msg_type=7
+#        msg={'type':msg_type,'value':None}
+#        msg=json.dumps(msg)
+#        client.send(msg)
 
     def serveClient(self,client,address):
         logger.info('[ INFO ] New Thread on connection from %s:%s' % address)
