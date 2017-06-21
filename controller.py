@@ -39,7 +39,7 @@ def init(ip,p):
     global compute_writer
     compute_writer=FlexyWriter(compute_publisher,compute_topic,[Reliable(),KeepLastHistory(1)])
 
-    announce_compute()
+    #announce_compute()
 
     app.run(debug=True,host=host,port=port)
 
