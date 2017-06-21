@@ -25,11 +25,11 @@ def init(ip,p):
     rt=Runtime()
     dp=Participant(0)
 
-    dp2=Participant(0)
+    #dp2=Participant(0)
 
 
-    register_topic=FlexyTopic(dp2,'ZoneInfo', lambda x: x.id,None)
-    register_subscriber=Subscriber(dp2,[Partition(['dds-kvm-compute'])])
+    register_topic=FlexyTopic(dp,'ZoneInfo', lambda x: x.id,None)
+    register_subscriber=Subscriber(dp,[Partition(['dds-kvm-compute'])])
     register_reader=FlexyReader(register_subscriber,register_topic,[Reliable()],add_zone_dds)
 
 
@@ -39,10 +39,11 @@ def init(ip,p):
     global compute_writer
     compute_writer=FlexyWriter(compute_publisher,compute_topic,[Reliable(),KeepLastHistory(1)])
 
+    announce_compute()
 
     app.run(debug=True,host=host,port=port)
 
-    announce_compute()
+    
 
 def add_zone_dds(r):
     samples = r.read(new_samples())

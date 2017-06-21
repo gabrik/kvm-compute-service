@@ -15,7 +15,7 @@ def init():
     rt=Runtime()
     dp=Participant(0)
 
-    dp2=Participant(0)
+    #dp2=Participant(0)
 
 
     register_topic=FlexyTopic(dp,'ComputeInfo', lambda x: x.id,None)
@@ -23,8 +23,8 @@ def init():
     register_reader=FlexyReader(register_subscriber,register_topic,[Reliable(),KeepLastHistory(1)],add_zone_dds)
 
     
-    compute_topic=FlexyTopic(dp2,'ZoneInfo', lambda c: c.id,None)
-    compute_publisher=Publisher(dp2,[Partition(['dds-kvm-compute'])])
+    compute_topic=FlexyTopic(dp,'ZoneInfo', lambda c: c.id,None)
+    compute_publisher=Publisher(dp,[Partition(['dds-kvm-compute'])])
 
     global compute_writer
     compute_writer=FlexyWriter(compute_publisher,compute_topic,[Reliable()])
