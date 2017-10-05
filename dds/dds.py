@@ -1,14 +1,25 @@
 from ctypes import *
 import os
 import jsonpickle
+import platform
 
 
 __author__ = 'Angelo Corsaro'
 
+def getLibExtension():
+    system = platform.system()
+    if system == 'Linux':
+        return '.so'
+    elif system == 'Darwin':
+        return '.dylib'
+    else:
+        return '.dll'
+
 
 #@TODO: Fix this to go and look for the right library...
-lite_lib = 'libdds.so'
-bit_lib = 'libdython.so'
+lite_lib = 'libdds' + getLibExtension()
+bit_lib = 'libdython' + getLibExtension()
+
 lite_lib_path = os.environ['LITE_HOME'] + os.sep + 'lib' + os.sep + os.environ['LITE_TARGET'] + os.sep + lite_lib
 # Yes, this assumes that the Python BIT should be under the lite lib... If not there copy it!
 bit_lib_path = os.environ['LITE_HOME'] + os.sep + 'lib' + os.sep + os.environ['LITE_TARGET'] + os.sep + bit_lib
@@ -316,8 +327,9 @@ class DataWriter:
         self.rt.ddslib.dds_writer_create(pub.handle, byref(self.handle), topic.handle, qos, None)
 
     def write(self, s):
-        self.rt.ddslib.dds_write(self.handle, byref(s))
-
+        print('Calling write %s' % s.value)
+        n_w = self.rt.ddslib.dds_write(self.handle, byref(s))
+        print("dds_write returned: %d " % n_w)
 
 class FlexyReader:
     def __init__(self, sub, flexy_topic, policies, flexy_data_listener):
@@ -499,8 +511,8 @@ class Runtime:
         self.livelinessChangeListenerMap = {}
 
 
-        self.ddslib = CDLL(lite_lib_path)
-        self.bitypes = CDLL(bit_lib_path)
+        self.ddslib = CDLL(lite_lib_path, mode = RTLD_GLOBAL)
+        self.bitypes = CDLL(bit_lib_path, mode = RTLD_GLOBAL) #cdll.LoadLibrary(bit_lib_path) #CDLL(bit_lib_path)
 
         self.ddslib.dds_init(0, None)
         self.kv_topic = None
@@ -542,6 +554,9 @@ class Runtime:
 
         self.ddslib.dds_take.restype = c_int
         # the_runtime.ddslib.dds_take.argtypes = []
+
+        ## test
+        self.ddslib.dds_write.restype = c_int
 
 
         global the_runtime

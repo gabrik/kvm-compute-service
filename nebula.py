@@ -1,12 +1,13 @@
 from dds.dds import *
 from utils import types
-import  time
+import time
 import sys
 import logging
 import json
 from flask import Flask
 import uuid
 import threading
+import libvirt
 
 
 
@@ -70,7 +71,6 @@ class Nebula(object):
         #self.register_reader=FlexyReader(self.register_subscriber,self.register_topic,[Reliable()],self.add_zone_dds)
         #self.compute_writer=FlexyWriter(self.compute_publisher,self.compute_topic,[Reliable(),KeepLastHistory(1)])
 
-    
     def flask_start(self):
         self.app.run(threaded=True,debug=True,use_reloader=False,host=self.host,port=self.port)
 
@@ -81,7 +81,8 @@ class Nebula(object):
         self.add_endpoint(endpoint='/new_instance', endpoint_name='new_instance', handler=self.new_instance)
         
         threading.Thread(target=self.flask_start).start()
-        self.announce_nebula_node()
+        #self.create_instance()
+        #self.announce_nebula_node()
 
    
 
@@ -116,6 +117,12 @@ class Nebula(object):
             info=types.KVMServiceMessage(0,{'zone':'uuid_zona','name':'instance_name','type':'instance_flavor'})
             self.compute_writer.write(info)
             time.sleep(5)
+
+    def create_instance(self):
+        conn=libvirt.open("qemu:///system")
+        names = conn.listDefinedDomains()
+        print names
+
 
 
     ### FLASK REST FOR CLIENTS
